@@ -44,6 +44,20 @@ interface ConnectedAccount {
   accountId: string;
 }
 
+interface TokenDebugInfo {
+  app_id?: string;
+  type?: string;
+  application?: string;
+  data_access_expires_at?: number;
+  expires_at?: number;
+  is_valid: boolean;
+  issued_at?: number;
+  profile_id?: string;
+  scopes?: string[];
+  user_id?: string;
+  error?: { message: string };
+}
+
 /**
  * Instagram Business Login — exchanges an OAuth `code` for a long-lived user
  * token, finds the first Facebook Page linked to an Instagram Business account,
@@ -78,6 +92,7 @@ export class InstagramOAuthService {
   ): Promise<ConnectedAccount> {
     const shortToken = await this.exchangeCodeForToken(code);
     const longToken = await this.exchangeForLongLived(shortToken);
+    const providerUserId = await this.fetchMeId(longToken);
     const page = await this.findFirstInstagramPage(longToken);
 
     if (!page.instagram_business_account) {
@@ -107,7 +122,10 @@ export class InstagramOAuthService {
       accountName: igUsername,
       accountId: page.instagram_business_account.id,
       accessToken: this.encryption.encrypt(page.access_token),
+      userAccessToken: this.encryption.encrypt(longToken),
+      providerUserId,
       tokenExpiresAt: expiresAt,
+      lastRefreshedAt: new Date(),
     };
 
     const account = existing
@@ -126,19 +144,149 @@ export class InstagramOAuthService {
   }
 
   /**
-   * Refreshes an existing Page Access Token by re-deriving it from a new
-   * long-lived user token. Used by `TokenRefreshService` on the cron schedule.
+   * Refreshes a Page Access Token by re-deriving it from the stored long-lived
+   * user token. Strategy:
+   *   1. Decrypt the user token, run `fb_exchange_token` to refresh it (extends
+   *      validity by another ~60d).
+   *   2. Re-fetch the user's pages and locate the one whose linked Instagram
+   *      Business account matches the saved accountId.
+   *   3. Persist the new page token + refreshed user token + updated expiry.
    *
-   * `refreshToken` here is the long-lived USER access token previously stored;
-   * we don't keep it separately right now (page tokens derived from a non-
-   * expiring system user don't expire), so the refresh path is a no-op until
-   * we wire user-level refresh tokens. Kept as a stub so the cron has a hook.
+   * Idempotent: safe to call repeatedly. Throws if the account has no stored
+   * user token (legacy rows from before the user-token column existed) so the
+   * cron logs the warning and the user can reconnect.
    */
   async refreshPageToken(socialAccountId: string): Promise<void> {
-    this.logger.warn(
-      `refreshPageToken(${socialAccountId}) — re-derive not yet implemented; ` +
-        `user must reconnect when token approaches expiry`,
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: socialAccountId },
+    });
+
+    if (!account.userAccessToken) {
+      throw new BadRequestException(
+        `Account ${socialAccountId} has no stored user token — user must reconnect`,
+      );
+    }
+
+    const currentUserToken = this.encryption.decrypt(account.userAccessToken);
+    const newUserToken = await this.exchangeForLongLived(currentUserToken);
+    const pages = await this.listInstagramPages(newUserToken);
+
+    const match = pages.find(
+      (p) => p.instagram_business_account?.id === account.accountId,
     );
+    if (!match) {
+      throw new BadRequestException(
+        `Linked Page for IG account ${account.accountId} no longer accessible — user must reconnect`,
+      );
+    }
+
+    const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+
+    await this.prisma.socialAccount.update({
+      where: { id: socialAccountId },
+      data: {
+        accessToken: this.encryption.encrypt(match.access_token),
+        userAccessToken: this.encryption.encrypt(newUserToken),
+        tokenExpiresAt: expiresAt,
+        lastRefreshedAt: new Date(),
+      },
+    });
+
+    this.logger.log(`Refreshed page token for account ${socialAccountId}`);
+  }
+
+  /**
+   * Diagnostic helper consumed by the `/oauth/instagram/diagnose` endpoint.
+   * Returns Meta-side state for a given account (token validity, scopes, linked
+   * pages and Instagram accounts) without persisting anything.
+   */
+  async describeAccount(socialAccountId: string): Promise<{
+    accountId: string;
+    accountName: string;
+    db: {
+      tokenExpiresAt: Date | null;
+      lastRefreshedAt: Date | null;
+      providerUserId: string | null;
+      hasUserToken: boolean;
+    };
+    pageToken: TokenDebugInfo;
+    pages: Array<{ id: string; name: string; hasInstagram: boolean; igUsername?: string }>;
+  }> {
+    const account = await this.prisma.socialAccount.findUniqueOrThrow({
+      where: { id: socialAccountId },
+    });
+
+    const pageToken = this.encryption.decrypt(account.accessToken);
+    const pageTokenDebug = await this.debugToken(pageToken);
+
+    let pages: Array<{ id: string; name: string; hasInstagram: boolean; igUsername?: string }> = [];
+    if (account.userAccessToken) {
+      try {
+        const userToken = this.encryption.decrypt(account.userAccessToken);
+        const apiPages = await this.listInstagramPages(userToken);
+        pages = await Promise.all(
+          apiPages.map(async (p) => {
+            const igId = p.instagram_business_account?.id;
+            const igUsername = igId
+              ? await this.fetchInstagramUsername(igId, p.access_token).catch(() => undefined)
+              : undefined;
+            return { id: p.id, name: p.name, hasInstagram: !!igId, igUsername };
+          }),
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Could not list pages for diagnose of ${socialAccountId}: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    return {
+      accountId: account.accountId,
+      accountName: account.accountName,
+      db: {
+        tokenExpiresAt: account.tokenExpiresAt,
+        lastRefreshedAt: account.lastRefreshedAt,
+        providerUserId: account.providerUserId,
+        hasUserToken: !!account.userAccessToken,
+      },
+      pageToken: pageTokenDebug,
+      pages,
+    };
+  }
+
+  configStatus(): { appIdSet: boolean; appSecretSet: boolean; redirectUri: string | null } {
+    return {
+      appIdSet: !!this.config.get<string>('META_APP_ID'),
+      appSecretSet: !!this.config.get<string>('META_APP_SECRET'),
+      redirectUri: this.config.get<string>('META_OAUTH_REDIRECT_URI') ?? null,
+    };
+  }
+
+  private async fetchMeId(userToken: string): Promise<string> {
+    const url = `${GRAPH_BASE}/me?fields=id&access_token=${encodeURIComponent(userToken)}`;
+    const json = await this.fetchJson<{ id: string }>('GET', url);
+    return json.id;
+  }
+
+  private async listInstagramPages(userToken: string): Promise<MetaPage[]> {
+    const params = new URLSearchParams({
+      fields: 'id,name,access_token,instagram_business_account',
+      access_token: userToken,
+    });
+    const url = `${GRAPH_BASE}/me/accounts?${params.toString()}`;
+    const json = await this.fetchJson<MetaPagesResponse>('GET', url);
+    return json.data ?? [];
+  }
+
+  private async debugToken(token: string): Promise<TokenDebugInfo> {
+    const appAccess = `${this.requireConfig('META_APP_ID')}|${this.requireConfig('META_APP_SECRET')}`;
+    const url = `${GRAPH_BASE}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(appAccess)}`;
+    try {
+      const json = await this.fetchJson<{ data: TokenDebugInfo }>('GET', url);
+      return json.data;
+    } catch (err) {
+      return { is_valid: false, error: { message: (err as Error).message } } as TokenDebugInfo;
+    }
   }
 
   private async exchangeCodeForToken(code: string): Promise<string> {

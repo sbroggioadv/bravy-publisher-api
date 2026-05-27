@@ -12,7 +12,12 @@ import {
 export class InstagramClient implements PublishAdapter {
   readonly platform: Platform = Platform.INSTAGRAM;
   private readonly logger = new Logger(InstagramClient.name);
-  private readonly API_BASE = 'https://graph.instagram.com/v21.0';
+  // IMPORTANT: must be graph.facebook.com, not graph.instagram.com.
+  // graph.instagram.com only accepts tokens from Instagram Basic Display
+  // (deprecated). Page Access Tokens from Facebook Login for Business —
+  // which is what our OAuth flow produces — only work against the Facebook
+  // Graph host. Using the IG host returns code 190 "Cannot parse access token".
+  private readonly API_BASE = 'https://graph.facebook.com/v21.0';
   private readonly PROCESS_WAIT_PER_SLIDE_MS = 8_000;
   private readonly CAROUSEL_WAIT_MS = 15_000;
 
@@ -101,8 +106,12 @@ export class InstagramClient implements PublishAdapter {
     data: Record<string, string>,
     accessToken: string,
   ): Promise<any> {
-    const url = `${this.API_BASE}${path}`;
-    const body = new URLSearchParams({ ...data, access_token: accessToken });
+    // Meta Graph v21 sometimes rejects access_token in POST bodies with code 190
+    // ("Cannot parse access token") even though the token itself is valid.
+    // Putting it on the query string matches the official Graph API examples
+    // and is consistently accepted across endpoints.
+    const url = `${this.API_BASE}${path}?access_token=${encodeURIComponent(accessToken)}`;
+    const body = new URLSearchParams(data);
 
     const response = await fetch(url, {
       method: 'POST',

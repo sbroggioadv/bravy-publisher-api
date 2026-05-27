@@ -75,21 +75,40 @@ Ambos os repos têm 1–3 commits (scaffold inicial). A pergunta do JP: **o que 
 
 **Entrega:** vídeo de 1 carrossel sendo gerado, renderizado e publicado no Instagram via app rodando localmente.
 
-### 🔐 Sprint 2 — OAuth real + segurança (1 semana)
+### 🔐 Sprint 2 — OAuth real + segurança ✅ ENTREGUE (2026-05-27)
 
 **Objetivo:** parar de pedir pro usuário colar accessToken na mão e endurecer a infra.
 
-- Implementar OAuth Instagram (Meta Business Login flow):
+- ✅ Implementar OAuth Instagram (Meta Business Login flow):
   - `GET /oauth/instagram/start` → redireciona pro Facebook
   - `GET /oauth/instagram/callback` → troca code por long-lived token, salva criptografado
-  - `frontend/src/features/accounts/components/account-connect-dialog.tsx` → fazer redirect real
-- Encriptar `SocialAccount.accessToken` (bug 4): AES-256-GCM, chave em `ENCRYPTION_KEY` env, helper `EncryptionService` no backend
-- Validar `JWT_SECRET` em runtime (bug 5): boot falha se for `change-me-in-production`
-- Refresh automático de token IG (long-lived expira em 60 dias) — cron mensal renovando
-- Rate limiting global (`@nestjs/throttler` já no package.json, mas não configurado)
-- Helmet + CORS restritivo em produção
+  - `frontend/src/features/accounts/components/account-connect-dialog.tsx` → redirect real
+- ✅ Encriptar `SocialAccount.accessToken`: AES-256-GCM via `EncryptionService` (`ENCRYPTION_KEY` em env)
+- ✅ Validar `JWT_SECRET` em runtime: `assertEnv()` em `main.ts` recusa boot com placeholder
+- ⚠️ Refresh automático de token IG: cron `TokenRefreshService` monitora expiração mas re-derive é stub. Page Tokens derivados de long-lived user token não expiram na prática — fica como dívida pra Sprint 3.
+- ✅ Rate limiting global: `ThrottlerModule.forRoot([{default 60/min},{auth 10/min}])` com `ThrottlerGuard` global
+- ✅ Helmet + CORS restritivo: `app.use(helmet())` + `enableCors({origin: parseCorsOrigins()})` lendo `FRONTEND_URL`/`CORS_ORIGINS`
 
-**Entrega:** usuário conecta IG via 1 clique (OAuth), sem ver token.
+**Entrega validada end-to-end:** carrossel gerado via Claude → renderizado em 6 PNGs 2160×2160 via Playwright → uploads no MinIO → servidos pelo proxy `/api/v1/files/*` via ngrok → publicação real no Instagram `@bravyschool` via Graph API v21.
+
+**Stack manual configurada nessa entrega (não estava no escopo do código mas precisou pra rodar):**
+- App Meta Business `Bravy Publisher` (App ID `1197613524832305`) com Facebook Login for Business + Instagram Graph API
+- Redirect URI cadastrada: `https://asvdigital.ngrok.app/api/v1/oauth/instagram/callback`
+- Conta IG `@bravyschool` (Business) vinculada à FB Page "Bravy School"
+- `ENCRYPTION_KEY` gerada (base64 32 bytes), `META_APP_ID`/`META_APP_SECRET` no `.env`
+- Bucket MinIO `publicacao-renders` criado com policy public-download
+- Chromium do Playwright instalado (`yarn playwright install chromium`)
+
+**Bugs encontrados e corrigidos durante o smoke test E2E:**
+- `generation.dto` esperava `tema` mas frontend mandava `theme` + `contentType` → frontend ajustado
+- `step-schedule` chamava `/content/:id` (singular) e tentava setar `status` direto → trocado por `updateContent` + `publishContent` separados
+- Slides do banco vinham com `bodyData: Json` (snake_case), frontend esperava campos achatados camelCase → criado `mapApiContent` em `frontend/src/features/content/lib/content-mapper.ts` aplicado em todas as queries
+- `AccountCard` mostrava "Expirado" porque backend não retornava `connected: boolean` → `social-accounts.service.toResponse()` agora calcula `connected` a partir de `tokenExpiresAt`
+- `PublishingService` enfileirava sem render pronto e o erro era silencioso → adicionada validação síncrona em `enqueuePublish` que retorna 400 se faltam slides renderizados
+- `MinioClient.publicUrl()` retornava `http://localhost:9000/...` que Meta não alcança → criado `FilesController` (`GET /api/v1/files/*` `@Public()`) que faz proxy via ngrok; nova env `PUBLIC_BASE_URL`
+- `InstagramClient.API_BASE` apontava pra `graph.instagram.com` (Instagram Basic Display, deprecated) que rejeitava Page Token com code 190 → trocado pra `graph.facebook.com`
+- `igPost` enviava `access_token` no body POST → trocado pra query string (mais consistente com exemplos oficiais)
+- Modelo Claude `claude-sonnet-4-20250514` deprecated → atualizado pra `claude-sonnet-4-6`
 
 ### 📊 Sprint 3 — Analytics real + agendamento confiável (1 semana)
 

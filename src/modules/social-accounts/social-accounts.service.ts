@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { SocialAccount } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { EncryptionService } from '../../common/services/encryption.service';
 import { CreateSocialAccountDto } from './dto/create-social-account.dto';
@@ -17,10 +18,7 @@ export class SocialAccountsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return accounts.map((account) => ({
-      ...account,
-      accessToken: '***',
-    }));
+    return accounts.map((account) => this.toResponse(account));
   }
 
   async create(tenantId: string, dto: CreateSocialAccountDto) {
@@ -36,7 +34,7 @@ export class SocialAccountsService {
           : undefined,
       },
     });
-    return { ...account, accessToken: '***' };
+    return this.toResponse(account);
   }
 
   async update(tenantId: string, id: string, dto: UpdateSocialAccountDto) {
@@ -60,7 +58,7 @@ export class SocialAccountsService {
           : undefined,
       },
     });
-    return { ...updated, accessToken: '***' };
+    return this.toResponse(updated);
   }
 
   async remove(tenantId: string, id: string) {
@@ -85,5 +83,20 @@ export class SocialAccountsService {
       select: { accessToken: true },
     });
     return this.encryption.decrypt(account.accessToken);
+  }
+
+  /**
+   * Shape the row for the API client: hide the encrypted token blob and add a
+   * derived `connected` flag (true when no expiry is set or expiry is in the
+   * future). The frontend's AccountCard reads this to render the status pill.
+   */
+  private toResponse(account: SocialAccount) {
+    const connected =
+      !account.tokenExpiresAt || account.tokenExpiresAt.getTime() > Date.now();
+    return {
+      ...account,
+      accessToken: '***',
+      connected,
+    };
   }
 }

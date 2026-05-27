@@ -22,6 +22,7 @@ import { FactCheckModule } from './modules/fact-check/fact-check.module';
 import { RenderModule } from './modules/render/render.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { GenerationModule } from './modules/generation/generation.module';
+import { FilesModule } from './modules/files/files.module';
 import redisConfig from './config/redis.config';
 
 @Module({
@@ -61,6 +62,7 @@ import redisConfig from './config/redis.config';
     RenderModule,
     PublishingModule,
     GenerationModule,
+    FilesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ContentType, Slide } from '@prisma/client';
@@ -19,6 +24,23 @@ export class PublishingService {
   ) {}
 
   async enqueuePublish(contentId: string, socialAccountId: string, scheduledAt?: Date) {
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId },
+      include: { slides: true },
+    });
+
+    if (!content) {
+      throw new NotFoundException(`Content ${contentId} not found`);
+    }
+
+    const renderedCount = content.slides.filter((s) => s.imageUrl).length;
+    const minRequired = content.contentType === 'CAROUSEL' ? 2 : 1;
+    if (renderedCount < minRequired) {
+      throw new BadRequestException(
+        `Content has ${renderedCount} rendered slide(s); ${content.contentType} needs at least ${minRequired}. Render first.`,
+      );
+    }
+
     const publishTarget = await this.prisma.publishTarget.create({
       data: {
         contentId,

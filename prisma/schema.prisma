@@ -89,15 +89,22 @@ model User {
 }
 
 model SocialAccount {
-  id             String    @id @default(uuid())
-  tenantId       String    @map("tenant_id")
-  platform       Platform
-  accountName    String    @map("account_name")
-  accountId      String    @map("account_id")
-  accessToken    String    @map("access_token")
-  tokenExpiresAt DateTime? @map("token_expires_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  platform         Platform
+  accountName      String    @map("account_name")
+  accountId        String    @map("account_id")
+  accessToken      String    @map("access_token")
+  // Long-lived user access token (encrypted) — kept so the refresh cron can
+  // re-derive a fresh Page Access Token without forcing the user to reconnect.
+  userAccessToken  String?   @map("user_access_token")
+  // Provider-side user id (e.g. Facebook user id) of whoever authorized the
+  // app — useful for debug/diagnose endpoints.
+  providerUserId   String?   @map("provider_user_id")
+  tokenExpiresAt   DateTime? @map("token_expires_at")
+  lastRefreshedAt  DateTime? @map("last_refreshed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id])
   publishTargets PublishTarget[]

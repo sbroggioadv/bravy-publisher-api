@@ -71,7 +71,7 @@ export class GenerationService {
     this.logger.log(`Generating carousel: ${input.tema} (${input.persona}, pattern ${pattern})`);
 
     const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       system: [{
         type: 'text' as const,
