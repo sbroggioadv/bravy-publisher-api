@@ -36,4 +36,8 @@ export class CreateContentDto {
   @IsOptional()
   @IsObject()
   slidesData?: any;
+
+  @IsOptional()
+  @IsObject()
+  styleData?: any;
 }

@@ -6,4 +6,6 @@ export const ACCENT_PALETTE: Record<Persona, { accent: string; hex: string }> = 
   arquiteto:  { accent: 'Ocre',           hex: '#C8932F' },
   empresario: { accent: 'Laranja Claude', hex: '#DA7756' },
   gestor:     { accent: 'Laranja Claude', hex: '#DA7756' },
+  engenheiro: { accent: 'Azul',           hex: '#4A6FA5' },
+  agencia:    { accent: 'Roxo',           hex: '#7B4DAA' },
 };

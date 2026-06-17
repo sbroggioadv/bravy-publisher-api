@@ -1,13 +1,19 @@
-import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsIn, IsOptional } from 'class-validator';
+import { PERSONAS, PATTERNS, Persona, HookPattern, TemplateName } from '../types';
 
 export class GenerateDto {
   @IsString()
   tema: string;
 
-  @IsEnum(['contador', 'advogado', 'empresario', 'gestor', 'arquiteto'])
-  persona: 'contador' | 'advogado' | 'empresario' | 'gestor' | 'arquiteto';
+  @IsIn(PERSONAS)
+  persona: Persona;
 
   @IsOptional()
-  @IsEnum(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'])
-  pattern?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+  @IsIn(PATTERNS)
+  pattern?: HookPattern;
+
+  /** família visual escolhida no wizard; ausente = automático (pelo pattern). */
+  @IsOptional()
+  @IsIn(['step', 'compendium'])
+  template?: TemplateName;
 }

@@ -23,6 +23,9 @@ import { RenderModule } from './modules/render/render.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { GenerationModule } from './modules/generation/generation.module';
 import { FilesModule } from './modules/files/files.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { BrandKitModule } from './modules/brand-kit/brand-kit.module';
+import { FontsModule } from './modules/fonts/fonts.module';
 import redisConfig from './config/redis.config';
 
 @Module({
@@ -42,10 +45,13 @@ import redisConfig from './config/redis.config';
       }),
     }),
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 60 },
-      { name: 'auth', ttl: 60_000, limit: 10 },
-    ]),
+    // Um único throttler global. NÃO definir buckets nomeados extras aqui:
+    // o ThrottlerGuard aplica TODOS os throttlers do forRoot em TODAS as
+    // rotas — um bucket "auth" de 10/min aqui limitava o app inteiro a
+    // 10 req/min (429 no estúdio). O limite estrito de auth vive como
+    // @Throttle() no AuthController. O default é alto porque o estúdio
+    // dispara rajadas legítimas (2 reqs/slide no Aprovar + autosaves).
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 300 }]),
     CommonModule,
     PrismaModule,
     MinioModule,
@@ -63,6 +69,9 @@ import redisConfig from './config/redis.config';
     PublishingModule,
     GenerationModule,
     FilesModule,
+    UploadsModule,
+    BrandKitModule,
+    FontsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

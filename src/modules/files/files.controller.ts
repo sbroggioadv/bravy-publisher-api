@@ -1,5 +1,6 @@
 import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { MinioClient } from '../../database/minio.client';
@@ -9,7 +10,12 @@ import { MinioClient } from '../../database/minio.client';
  * APIs fetch rendered slide PNGs over our public tunnel without exposing the
  * MinIO endpoint directly. Uses a catch-all so multi-segment keys (with `/`)
  * resolve to the underlying object key.
+ *
+ * SkipThrottle: serve assets (fontes + PNGs) em rajada — um load do estúdio
+ * busca ~8 fontes + N imagens de uma vez, e o Meta/LinkedIn baixam o carrossel
+ * inteiro ao publicar. Contar isso no rate limit global derruba o app (429).
  */
+@SkipThrottle()
 @ApiTags('files')
 @Controller('files')
 export class FilesController {

@@ -1,4 +1,4 @@
-import { IsInt, IsEnum, IsObject, Min } from 'class-validator';
+import { IsInt, IsEnum, IsObject, IsOptional, IsString, Min } from 'class-validator';
 import { SlideType } from '@prisma/client';
 
 export class CreateSlideDto {
@@ -11,4 +11,18 @@ export class CreateSlideDto {
 
   @IsObject()
   bodyData: any;
+
+  /** Deltas do editor de cena (scene-engine OverrideMap), esparso por slide. */
+  @IsOptional()
+  @IsObject()
+  sceneOverrides?: any;
+
+  /** PNG exportado pelo estúdio (cliente) — persistido p/ publicação. */
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  imageKey?: string;
 }

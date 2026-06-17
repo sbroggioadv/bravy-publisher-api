@@ -1,4 +1,4 @@
-import { Persona, HookPattern, PatternInfo, VocabEntry, DatasetTop } from '../types';
+import { Persona, HookPattern, PatternInfo, TemplateName, VocabEntry, DatasetTop } from '../types';
 
 export function buildSystemPrompt(params: {
   persona: Persona;
@@ -7,10 +7,13 @@ export function buildSystemPrompt(params: {
   topPosts: DatasetTop[];
   vocab: VocabEntry;
   accentHex: string;
+  /** escolha explícita do usuário no wizard; sem ela, decide pelo pattern. */
+  templateOverride?: TemplateName;
 }): string {
   const { persona, pattern, patterns, topPosts, vocab, accentHex } = params;
   const activePattern = patterns.find(p => p.id === pattern);
-  const templateName = ['D', 'G', 'H'].includes(pattern) ? 'compendium' : 'step';
+  const templateName: TemplateName =
+    params.templateOverride ?? (['D', 'G', 'H'].includes(pattern) ? 'compendium' : 'step');
 
   // Build vocabulary section dynamically based on available keys
   const vocabLines: string[] = [];

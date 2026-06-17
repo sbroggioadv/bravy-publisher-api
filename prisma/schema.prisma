@@ -68,8 +68,31 @@ model Tenant {
   users          User[]
   contents       Content[]
   socialAccounts SocialAccount[]
+  brandKits      BrandKit[]
 
   @@map("tenants")
+}
+
+// Style guide por tenant (RFC §13) — tipografia/paleta/strings da marca.
+// O kit editorial JP.ASV é só o seed default; edições incrementam `version`.
+model BrandKit {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  version    Int      @default(1)
+  // nome do estilo (kits nomeados além do default do tenant)
+  name       String?
+  // família de layout preferida do estilo (step | compendium)
+  template   String?
+  typography Json
+  palette    Json
+  brand      Json
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("brand_kits")
 }
 
 model User {
@@ -138,6 +161,10 @@ model Content {
   hookCapa    String?       @map("hook_capa") @db.Text
   caption     String?       @db.Text
   slidesData  Json?         @map("slides_data")
+  brandKitId      String? @map("brand_kit_id")
+  brandKitVersion Int?    @map("brand_kit_version")
+  // estilo aplicado ao post (snapshot completo: typography/palette/template)
+  styleData       Json?   @map("style_data")
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
   deletedAt   DateTime?     @map("deleted_at")
@@ -156,17 +183,19 @@ model Content {
 }
 
 model Slide {
-  id        String    @id @default(uuid())
-  contentId String    @map("content_id")
-  position  Int
-  slideType SlideType @default(BODY) @map("slide_type")
-  bodyData  Json      @map("body_data")
-  imageUrl  String?   @map("image_url")
-  imageKey  String?   @map("image_key")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id             String    @id @default(uuid())
+  contentId      String    @map("content_id")
+  position       Int
+  slideType      SlideType @default(BODY) @map("slide_type")
+  bodyData       Json      @map("body_data")
+  sceneOverrides Json?     @map("scene_overrides")
+  imageUrl       String?   @map("image_url")
+  imageKey       String?   @map("image_key")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
+  @@unique([contentId, position])
   @@map("slides")
 }
 

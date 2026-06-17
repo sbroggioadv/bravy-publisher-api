@@ -4,6 +4,7 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../../database/prisma.service';
 import { MinioClient } from '../../database/minio.client';
 import { renderCarousel } from './template-engine';
+import { carouselToDoc } from './carousel-to-doc';
 import { CarouselInput, RenderResult } from './types';
 import { v4 as uuid } from 'uuid';
 
@@ -90,6 +91,7 @@ export class RenderService {
       .replace(/[:.]/g, '-')
       .slice(0, 19);
     const slides: RenderResult['slides'] = [];
+    const playwrightByPos = new Map<number, Buffer>();
 
     for (let i = 0; i < slideCount; i++) {
       await page.evaluate(ISOLATE_JS, i);
@@ -102,6 +104,7 @@ export class RenderService {
       });
 
       const buffer = Buffer.from(buf);
+      playwrightByPos.set(i, buffer);
       const key = `${contentId}/${timestamp}/slide-${String(i + 1).padStart(2, '0')}.png`;
       await this.minio.putBuffer(key, buffer, 'image/png');
 
@@ -136,7 +139,70 @@ export class RenderService {
     }
 
     await browser.close();
+
+    if (process.env.RENDER_SHADOW_SKIA === '1') {
+      await this.runShadowCompareSkia(carouselData, playwrightByPos, content.tenantId);
+    }
+
     return { contentId, slides };
+  }
+
+  /**
+   * Shadow-compare (RFC §8 / Sprint 1): renderiza o MESMO conteúdo pelo engine
+   * skia (scene-engine) em paralelo ao Playwright e loga o diff pixel-a-pixel.
+   * Não substitui as imagens publicadas — só mede a paridade rumo ao cutover.
+   * Ligado por RENDER_SHADOW_SKIA=1; qualquer falha é não-bloqueante.
+   */
+  private async runShadowCompareSkia(
+    carouselData: CarouselInput,
+    playwrightByPos: Map<number, Buffer>,
+    tenantId?: string,
+  ): Promise<void> {
+    try {
+      const { renderScenePng, diffPng } = (await import(
+        '@publisher/scene-engine/node'
+      )) as typeof import('@publisher/scene-engine/node');
+
+      // kit do tenant (mesma fonte do estúdio) — paridade de marca no server
+      const dbKit = tenantId
+        ? await this.prisma.brandKit.findFirst({ where: { tenantId, isDefault: true } })
+        : null;
+      const brandKit = dbKit
+        ? ({
+            id: dbKit.id,
+            tenantId: dbKit.tenantId,
+            version: dbKit.version,
+            typography: dbKit.typography,
+            palette: dbKit.palette,
+            brand: dbKit.brand,
+          } as unknown as import('@publisher/scene-engine').BrandKit)
+        : undefined;
+
+      const doc = carouselToDoc(carouselData);
+      const t0 = Date.now();
+      const rendered = renderScenePng(doc, { pixelRatio: 2, brandKit });
+      const dt = Date.now() - t0;
+
+      let worst = 0;
+      for (const r of rendered) {
+        const ref = playwrightByPos.get(r.index);
+        if (!ref) continue;
+        const d = diffPng(r.png, ref);
+        worst = Math.max(worst, d.ratio);
+        this.logger.log(
+          `[shadow] slide ${r.index}: diff ${(d.ratio * 100).toFixed(2)}% ` +
+            `(${r.nodeCount} nós, skia ${r.width}x${r.height})` +
+            (d.mismatchedSize ? ' [DIMENSÕES DIFEREM]' : ''),
+        );
+      }
+      this.logger.log(
+        `[shadow] skia: ${rendered.length} slides em ${dt}ms — pior diff ${(worst * 100).toFixed(2)}%`,
+      );
+    } catch (e) {
+      this.logger.warn(
+        `[shadow] comparação skia falhou (não bloqueia o render): ${(e as Error).message}`,
+      );
+    }
   }
 
   private async findOrCreateSlideId(

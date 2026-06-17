@@ -1,5 +1,21 @@
-export type Persona = 'contador' | 'advogado' | 'empresario' | 'gestor' | 'arquiteto';
-export type HookPattern = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H';
+/**
+ * Fonte unica das personas e padroes validos para geracao.
+ * Mantenha em sincronia com o frontend (PERSONAS em lib/constants.ts).
+ */
+export const PERSONAS = [
+  'contador',
+  'advogado',
+  'empresario',
+  'gestor',
+  'arquiteto',
+  'engenheiro',
+  'agencia',
+] as const;
+
+export const PATTERNS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;
+
+export type Persona = (typeof PERSONAS)[number];
+export type HookPattern = (typeof PATTERNS)[number];
 export type TemplateName = 'step' | 'compendium';
 
 export interface PatternInfo {
@@ -40,6 +56,8 @@ export interface GenerationInput {
   tema: string;
   persona: Persona;
   pattern?: HookPattern;
+  /** família visual explícita do wizard (ausente = automático pelo pattern). */
+  template?: TemplateName;
 }
 
 export interface GenerationOutput {
