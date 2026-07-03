@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './database/prisma.module';
 import { MinioModule } from './database/minio.module';
-import { RenderModule } from './modules/render/render.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { FactCheckModule } from './modules/fact-check/fact-check.module';
 import redisConfig from './config/redis.config';
@@ -27,7 +26,6 @@ import redisConfig from './config/redis.config';
     PrismaModule,
     MinioModule,
     FactCheckModule,
-    RenderModule,
     PublishingModule,
   ],
 })

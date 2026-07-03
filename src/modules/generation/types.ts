@@ -62,6 +62,26 @@ export interface GenerationInput {
   styleData?: Record<string, unknown>;
 }
 
+/**
+ * Espelho snake_case do SlideImage do scene-engine, como persistido em
+ * slidesData/bodyData (mesmo shape que o adapter de render consome).
+ */
+export interface SlideImageRaw {
+  enabled: boolean;
+  role: 'figure' | 'background';
+  prompt: string;
+  model: 'nano-banana' | 'gpt-5.5-image';
+  seed?: number;
+  focal?: { x: number; y: number };
+  treatment?: 'duotone' | 'grain' | 'none';
+  status: 'idle' | 'queued' | 'generating' | 'ready' | 'failed';
+  asset_url?: string;
+  asset_key?: string;
+  width?: number;
+  height?: number;
+  last_error?: string;
+}
+
 export interface GenerationOutput {
   slug: string;
   padrao: HookPattern;
@@ -87,6 +107,10 @@ export interface GenerationOutput {
       highlight?: boolean;
     }>;
     callout?: string;
+    /** descrição visual em inglês emitida pelo LLM (opcional, template tweet). */
+    image_prompt?: string;
+    /** imagem gerada por IA p/ o slide (gravada pelo SlideImageService). */
+    image?: SlideImageRaw;
   }>;
   cta_label_topo: string;
   cta_label: string;

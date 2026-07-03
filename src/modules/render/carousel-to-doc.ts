@@ -7,9 +7,15 @@ import type {
   CardText,
   ContentText,
   DesignDocument,
+  SlideImage,
   SlideText,
 } from '@publisher/scene-engine';
-import type { CarouselInput, CardInput, SlideInput } from './types';
+import type {
+  CarouselInput,
+  CardInput,
+  SlideImageInput,
+  SlideInput,
+} from './types';
 
 function mapCard(c: CardInput): CardText {
   return {
@@ -18,6 +24,24 @@ function mapCard(c: CardInput): CardText {
     title: c.title,
     body: c.body,
     highlight: c.highlight,
+  };
+}
+
+function mapSlideImage(i: SlideImageInput): SlideImage {
+  return {
+    enabled: i.enabled,
+    role: i.role,
+    prompt: i.prompt,
+    model: i.model,
+    seed: i.seed,
+    focal: i.focal,
+    treatment: i.treatment,
+    status: i.status,
+    assetUrl: i.asset_url,
+    assetKey: i.asset_key,
+    width: i.width,
+    height: i.height,
+    lastError: i.last_error,
   };
 }
 
@@ -33,6 +57,7 @@ function mapSlide(s: SlideInput): SlideText {
     stats: s.stats,
     cards: s.cards?.map(mapCard),
     callout: s.callout,
+    image: s.image ? mapSlideImage(s.image) : undefined,
   };
 }
 

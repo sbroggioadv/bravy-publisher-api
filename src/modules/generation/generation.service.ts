@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ZodType } from 'zod';
 import { PrismaService } from '../../database/prisma.service';
 import { FactCheckService } from '../fact-check/fact-check.service';
+import { SlideImageService } from './slide-image.service';
 import { buildSystemPrompt } from './prompts/carousel-prompt';
 import { buildThemeIdeasPrompt } from './prompts/theme-ideas-prompt';
 import { selectTemplate } from './prompts/template-selector';
@@ -49,6 +50,7 @@ export class GenerationService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly factCheck: FactCheckService,
+    private readonly slideImage: SlideImageService,
   ) {
     this.anthropic = new Anthropic({
       apiKey: this.config.get<string>('ANTHROPIC_API_KEY'),
@@ -188,6 +190,27 @@ export class GenerationService {
       },
       include: { slides: true, generations: true },
     });
+
+    // P1: imagens por slide (best-effort, fire-and-forget — não bloqueia a resposta).
+    // Sequencial de propósito: a dupla-escrita faz read-modify-write no slidesData.
+    if (this.slideImage.hasProvider()) {
+      const positions = generated.slides
+        .map((s, i) => (s.image_prompt ? i + 1 : null))
+        .filter((p): p is number => p !== null);
+      if (positions.length) {
+        void (async () => {
+          for (const position of positions) {
+            await this.slideImage
+              .generateForSlide(content.id, position, tenantId)
+              .catch((err) =>
+                this.logger.warn(
+                  `Imagem do slide ${position} falhou (best-effort): ${err?.message ?? err}`,
+                ),
+              );
+          }
+        })();
+      }
+    }
 
     return content;
   }

@@ -26,6 +26,8 @@ export const SlideOutSchema = z.object({
     )
     .optional(),
   callout: z.string().optional(),
+  /** descrição visual em inglês p/ geração de imagem do slide (template tweet). */
+  image_prompt: z.string().optional(),
 });
 
 export const GenerationOutputSchema = z.object({

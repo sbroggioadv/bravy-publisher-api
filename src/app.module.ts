@@ -19,7 +19,6 @@ import { DatasetsModule } from './modules/datasets/datasets.module';
 import { SchedulesModule } from './modules/schedules/schedules.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { FactCheckModule } from './modules/fact-check/fact-check.module';
-import { RenderModule } from './modules/render/render.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { GenerationModule } from './modules/generation/generation.module';
 import { FilesModule } from './modules/files/files.module';
@@ -65,7 +64,6 @@ import redisConfig from './config/redis.config';
     SchedulesModule,
     AnalyticsModule,
     FactCheckModule,
-    RenderModule,
     PublishingModule,
     GenerationModule,
     FilesModule,

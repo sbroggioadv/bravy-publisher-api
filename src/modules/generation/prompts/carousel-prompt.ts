@@ -218,7 +218,16 @@ ${
     : templateName === 'compendium'
       ? 'Terminal: capa preta com prompt mono $ jp.asv solve... + slides aspecto IDE/log + checklist > em mono'
       : templateName === 'tweet'
-        ? 'Tweet: cada slide e um card estilo X/Twitter (avatar + @handle + contador). Texto CURTO e conversacional, 1 ideia por slide, frases de tweet (max ~2-3 linhas por paragrafo). Prefira "paragraphs" curtos a listas/cards. Use <em> pra enfase.'
+        ? `Tweet: cada slide e um card estilo X/Twitter (avatar + @handle + contador). Texto CURTO e conversacional, 1 ideia por slide. Use <em> pra enfase.
+ORCAMENTO DE TEXTO DO TWEET (obrigatorio — o card ENCOLHE E CORTA com "…" o que passar):
+- hook_capa: 1 frase, max 100 caracteres (vira o texto grande da capa).
+- Slide body: "tag" curto (2-4 palavras) + NO MAXIMO 2 "paragraphs" de ate 100 caracteres cada. NUNCA use "cards" no tweet.
+- "list": maximo 3 itens de ate 45 caracteres cada. "stats": maximo 3 pares, texto de ate 45 caracteres.
+- cta_text: max 110 caracteres. cta_sub: max 40 caracteres.
+IMAGEM POR SLIDE (campo OPCIONAL "image_prompt" nos slides body):
+- Inclua "image_prompt" em APENAS 1-2 slides body onde a imagem AGREGA (cena concreta, prova visual do que o texto afirma). NUNCA em todos; se nenhum se beneficia, nao inclua em nenhum.
+- Valor: descricao visual concreta EM INGLES, ate 200 caracteres — cena fotografica realista ou ilustracao editorial relacionada ao conteudo daquele slide (ex: "overhead photo of an accountant's desk with tax documents and a laptop, warm morning light").
+- PROIBIDO dentro da imagem: texto, letras, numeros, logos, marcas, marcas d'agua, telas com texto legivel.`
         : 'Custom: conteudo de carrossel padrao (headline, paragrafos curtos, bullets, CTA). O layout visual e definido pelo template do usuario — foque em texto claro e direto que caiba em poucos slots.'
 }
 Accent hex: ${accentHex}

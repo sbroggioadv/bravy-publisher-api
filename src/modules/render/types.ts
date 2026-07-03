@@ -24,6 +24,24 @@ export interface SlideInput {
   stats?: [string, string][];
   cards?: CardInput[];
   callout?: string;
+  image?: SlideImageInput;
+}
+
+/** Espelho snake_case do SlideImage do scene-engine. */
+export interface SlideImageInput {
+  enabled: boolean;
+  role: 'figure' | 'background';
+  prompt: string;
+  model: 'nano-banana' | 'gpt-5.5-image';
+  seed?: number;
+  focal?: { x: number; y: number };
+  treatment?: 'duotone' | 'grain' | 'none';
+  status: 'idle' | 'queued' | 'generating' | 'ready' | 'failed';
+  asset_url?: string;
+  asset_key?: string;
+  width?: number;
+  height?: number;
+  last_error?: string;
 }
 
 export interface CardInput {

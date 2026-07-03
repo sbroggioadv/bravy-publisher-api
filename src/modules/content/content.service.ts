@@ -106,11 +106,21 @@ export class ContentService {
   }
 
   async update(id: string, tenantId: string, dto: UpdateContentDto) {
-    await this.ensureExists(id, tenantId);
+    const content = await this.ensureExists(id, tenantId);
+
+    // merge server-side: o studio manda slidesData inteiro (patch de texto);
+    // preserva `image` gravada pelo pipeline de geração quando o payload não a traz.
+    const data: Record<string, any> = { ...dto };
+    if (dto.slidesData !== undefined) {
+      data.slidesData = this.mergeSlidesDataImages(
+        content.slidesData,
+        dto.slidesData,
+      );
+    }
 
     return this.prisma.content.update({
       where: { id },
-      data: dto,
+      data,
     });
   }
 
@@ -238,9 +248,16 @@ export class ContentService {
       throw new NotFoundException(`Slide ${slideId} not found`);
     }
 
+    // merge server-side: bodyData é JSON substituído por inteiro pelo Prisma;
+    // preserva `image` do registro atual quando o patch não a traz explicitamente.
+    const data: Record<string, any> = { ...dto };
+    if (dto.bodyData !== undefined) {
+      data.bodyData = this.preserveImage(slide.bodyData, dto.bodyData);
+    }
+
     return this.prisma.slide.update({
       where: { id: slideId },
-      data: dto,
+      data,
     });
   }
 
@@ -258,6 +275,43 @@ export class ContentService {
     return this.prisma.slide.delete({
       where: { id: slideId },
     });
+  }
+
+  /**
+   * Mantém `image` do objeto atual quando o payload não a traz explicitamente.
+   * Payload com `image` (mesmo null) prevalece — permite limpar/substituir de propósito.
+   */
+  private preserveImage(current: unknown, incoming: any): any {
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+      return incoming;
+    }
+    if ('image' in incoming) return incoming;
+    const image =
+      current && typeof current === 'object' && !Array.isArray(current)
+        ? (current as Record<string, unknown>).image
+        : undefined;
+    return image !== undefined ? { ...incoming, image } : incoming;
+  }
+
+  /** Idem para content.slidesData: preserva `image` por índice em slides[]. */
+  private mergeSlidesDataImages(current: unknown, incoming: any): any {
+    if (
+      !incoming ||
+      typeof incoming !== 'object' ||
+      !Array.isArray(incoming.slides)
+    ) {
+      return incoming;
+    }
+    const currentSlides =
+      current && typeof current === 'object' && Array.isArray((current as any).slides)
+        ? ((current as any).slides as unknown[])
+        : [];
+    return {
+      ...incoming,
+      slides: incoming.slides.map((slide: any, idx: number) =>
+        this.preserveImage(currentSlides[idx], slide),
+      ),
+    };
   }
 
   private async ensureExists(id: string, tenantId: string) {
