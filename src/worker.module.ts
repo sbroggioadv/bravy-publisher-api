@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { CommonModule } from './common/common.module';
 import { PrismaModule } from './database/prisma.module';
 import { MinioModule } from './database/minio.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
@@ -23,6 +24,9 @@ import redisConfig from './config/redis.config';
         },
       }),
     }),
+    // PublishingService injeta EncryptionService (exportado por CommonModule).
+    // No app HTTP o CommonModule já entra via AppModule; no worker precisa ser explícito.
+    CommonModule,
     PrismaModule,
     MinioModule,
     FactCheckModule,
