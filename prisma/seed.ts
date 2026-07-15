@@ -66,6 +66,23 @@ async function seedTenantAndUser() {
   });
   console.log(`  User: ${user.id} (${user.email})`);
 
+  // Login de dev do Doc. Senha padrao de teste `luis123` (< 8 chars, entao
+  // NAO passa pelo /auth/register que exige MinLength(8) — por isso semeada
+  // direto). `update` reidrata a senha em cada seed para garantir o acesso.
+  const docPassword = bcrypt.hashSync('luis123', 12);
+  const docUser = await prisma.user.upsert({
+    where: { email: 'luis@sbroggio.io' },
+    update: { password: docPassword, role: 'OWNER', tenantId: tenant.id },
+    create: {
+      email: 'luis@sbroggio.io',
+      password: docPassword,
+      name: 'Luis Sbroggio',
+      role: 'OWNER',
+      tenantId: tenant.id,
+    },
+  });
+  console.log(`  User: ${docUser.id} (${docUser.email})`);
+
   return { tenant, user };
 }
 
